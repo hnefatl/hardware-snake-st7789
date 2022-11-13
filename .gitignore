@@ -1,0 +1,14 @@
+**/*.rs.bk
+.#*
+.gdb_history
+Cargo.lock
+target/
+
+# editor files
+.vscode/*
+# Don't include .svd files for licensing reasons.
+# Download from https://www.st.com/resource/en/svd/stm32f3_svd.zip
+.vscode/*.svd
+!.vscode/*.md
+!.vscode/launch.json
+!.vscode/tasks.json

@@ -1,0 +1,76 @@
+{
+    /* 
+     * Requires the Rust Language Server (RLS) and Cortex-Debug extensions
+     * https://marketplace.visualstudio.com/items?itemName=rust-lang.rust
+     * https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug
+     */
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cortex-debug",
+            "request": "launch",
+            "name": "Debug (QEMU)",
+            "servertype": "qemu",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Cargo Build (debug)",
+            "runToEntryPoint": "main",
+            "executable": "./target/thumbv7em-none-eabihf/debug/snake",
+            "cpu": "cortex-m4",
+            "machine": "lm3s6965evb",
+        },
+        {
+            /* Configuration for the STM32F303 Discovery board */
+            "type": "cortex-debug",
+            "request": "launch",
+            "name": "Debug (OpenOCD)",
+            "servertype": "openocd",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Cargo Build (debug)",
+            //"runToEntryPoint": "main",
+            "executable": "./target/thumbv7em-none-eabihf/debug/snake",
+            "device": "STM32F303VCT6",
+            "configFiles": [
+                "openocd.cfg",
+                //"interface/stlink.cfg",
+                //"target/stm32f3x.cfg"
+            ],
+            "svdFile": "${workspaceRoot}/.vscode/STM32F303.svd",
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 8000000,
+                "swoFrequency": 2000000,
+                "source": "probe",
+                "decoders": [
+                    { "type": "console", "label": "ITM", "port": 0 }
+                ]
+            }
+        },
+        {
+            /* Configuration for the STM32F303 Discovery board */
+            "type": "cortex-debug",
+            "request": "launch",
+            "name": "Release (OpenOCD)",
+            "servertype": "openocd",
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "Cargo Build (release)",
+            //"runToEntryPoint": "main",
+            "executable": "./target/thumbv7em-none-eabihf/release/snake",
+            "device": "STM32F303VCT6",
+            "configFiles": [
+                "openocd.cfg",
+                //"interface/stlink.cfg",
+                //"target/stm32f3x.cfg"
+            ],
+            "svdFile": "${workspaceRoot}/.vscode/STM32F303.svd",
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 8000000,
+                "swoFrequency": 2000000,
+                "source": "probe",
+                "decoders": [
+                    { "type": "console", "label": "ITM", "port": 0 }
+                ]
+            }
+        }
+    ]
+}
