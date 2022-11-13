@@ -2,19 +2,17 @@
 #![no_main]
 #![feature(exhaustive_patterns)]
 #![feature(stmt_expr_attributes)]
+#![feature(mixed_integer_ops)]
+// Maybe this is breaking stuff?
+#![feature(generic_const_exprs)]
 
 //use panic_halt as _; // breakpoint on `rust_begin_unwind` to catch panics
 use panic_semihosting as _;
 
 use cortex_m_rt::entry;
 use display_interface_spi::SPIInterface;
-use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, MonoTextStyleBuilder},
-    pixelcolor::Rgb565,
-    prelude::*,
-    text::{Baseline, Text},
-};
-use st7789::{self, Orientation};
+use embedded_graphics::{pixelcolor::Rgb565, prelude::*};
+use st7789;
 use stm32f3xx_hal::{
     block, pac,
     prelude::*,
@@ -22,6 +20,8 @@ use stm32f3xx_hal::{
     time::{duration::Seconds, rate::Megahertz},
     timer::Timer,
 };
+
+mod game;
 
 #[entry]
 fn main() -> ! {
@@ -70,38 +70,13 @@ fn main() -> ! {
 
     let mut delay = cortex_m::delay::Delay::new(core_peripherals.SYST, clocks.hclk().0);
     display.init(&mut delay).unwrap();
-
-    let character_style = MonoTextStyleBuilder::new()
-        .font(&FONT_6X10)
-        .text_color(Rgb565::RED)
-        .build();
-
     display.clear(Rgb565::BLACK).unwrap();
-    Text::with_baseline("hello world", Point::new(0, 0), character_style, Baseline::Top)
-        .draw(&mut display)
-        .unwrap();
-    timer.start(Seconds(2));
-    block!(timer.wait()).unwrap();
 
-    let colours = [
-        Rgb565::RED,
-        Rgb565::GREEN,
-        Rgb565::BLUE,
-        Rgb565::YELLOW,
-        Rgb565::CSS_PURPLE,
-    ];
-    let orientations = [
-        Orientation::Portrait,
-        Orientation::Landscape,
-        Orientation::PortraitSwapped,
-        Orientation::LandscapeSwapped,
-    ];
-    let mut orientation_index = 0;
+    let mut game = game::Game::<240, 240>::new();
     loop {
-        for colour in colours {
-            display.set_orientation(orientations[orientation_index]).unwrap();
-            orientation_index = (orientation_index + 1) % orientations.len();
-            display.clear(colour).unwrap();
-        }
+        game.update();
+        game.render(&mut display);
+        timer.start(Seconds(1));
+        block!(timer.wait()).unwrap();
     }
 }
