@@ -15,7 +15,13 @@ use embedded_graphics::{
     text::{Baseline, Text},
 };
 use st7789;
-use stm32f3xx_hal::{block, pac, prelude::*, spi, time::duration::Seconds, timer::Timer};
+use stm32f3xx_hal::{
+    block, pac,
+    prelude::*,
+    spi,
+    time::{duration::Seconds, rate::Megahertz},
+    timer::Timer,
+};
 
 #[entry]
 fn main() -> ! {
@@ -23,7 +29,11 @@ fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
     let mut reset_and_clock_control = peripherals.RCC.constrain();
     let mut flash = peripherals.FLASH.constrain();
-    let clocks = reset_and_clock_control.cfgr.freeze(&mut flash.acr);
+    let clocks = reset_and_clock_control
+        .cfgr
+        .sysclk(Megahertz(64))
+        .pclk2(Megahertz(64))
+        .freeze(&mut flash.acr);
     let mut timer = Timer::new(peripherals.TIM1, clocks, &mut reset_and_clock_control.apb2);
 
     // For determining which bus (ahb) is needed, section 3.2.2 in
@@ -41,7 +51,7 @@ fn main() -> ! {
         .pa7
         .into_af_push_pull::<5>(&mut gpioa.moder, &mut gpioa.otyper, &mut gpioa.afrl);
 
-    let spi_config = spi::config::Config::default();
+    let spi_config = spi::config::Config::default().frequency(Megahertz(20));
     let spi = spi::Spi::new(
         peripherals.SPI1,
         (sclk, miso, mosi),
@@ -70,7 +80,7 @@ fn main() -> ! {
     Text::with_baseline("hello world", Point::new(0, 0), character_style, Baseline::Top)
         .draw(&mut display)
         .unwrap();
-    timer.start(Seconds(1));
+    timer.start(Seconds(2));
     block!(timer.wait()).unwrap();
 
     loop {
