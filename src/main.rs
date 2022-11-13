@@ -14,7 +14,7 @@ use embedded_graphics::{
     prelude::*,
     text::{Baseline, Text},
 };
-use st7789;
+use st7789::{self, Orientation};
 use stm32f3xx_hal::{
     block, pac,
     prelude::*,
@@ -83,8 +83,25 @@ fn main() -> ! {
     timer.start(Seconds(2));
     block!(timer.wait()).unwrap();
 
+    let colours = [
+        Rgb565::RED,
+        Rgb565::GREEN,
+        Rgb565::BLUE,
+        Rgb565::YELLOW,
+        Rgb565::CSS_PURPLE,
+    ];
+    let orientations = [
+        Orientation::Portrait,
+        Orientation::Landscape,
+        Orientation::PortraitSwapped,
+        Orientation::LandscapeSwapped,
+    ];
+    let mut orientation_index = 0;
     loop {
-        display.clear(Rgb565::WHITE).unwrap();
-        display.clear(Rgb565::BLACK).unwrap();
+        for colour in colours {
+            display.set_orientation(orientations[orientation_index]).unwrap();
+            orientation_index = (orientation_index + 1) % orientations.len();
+            display.clear(colour).unwrap();
+        }
     }
 }
