@@ -78,9 +78,9 @@ fn main() -> ! {
     let mut game =
         game::Game::<{ GAME_WIDTH_PIXELS / PIXEL_WIDTH }, { GAME_HEIGHT_PIXELS / PIXEL_WIDTH }, PIXEL_WIDTH>::new();
     loop {
+        timer.start(Milliseconds(500));
         game.update();
         game.render(&mut display);
-        timer.start(Milliseconds(500));
         block!(timer.wait()).unwrap();
     }
 }
