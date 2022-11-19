@@ -17,7 +17,7 @@ use stm32f3xx_hal::{
     block, pac,
     prelude::*,
     spi,
-    time::{duration::Seconds, rate::Megahertz},
+    time::{duration::Milliseconds, rate::Megahertz},
     timer::Timer,
 };
 
@@ -72,11 +72,15 @@ fn main() -> ! {
     display.init(&mut delay).unwrap();
     display.clear(Rgb565::BLACK).unwrap();
 
-    let mut game = game::Game::<240, 240>::new();
+    const GAME_WIDTH_PIXELS: u8 = 240;
+    const GAME_HEIGHT_PIXELS: u8 = 240;
+    const PIXEL_WIDTH: u8 = 10;
+    let mut game =
+        game::Game::<{ GAME_WIDTH_PIXELS / PIXEL_WIDTH }, { GAME_HEIGHT_PIXELS / PIXEL_WIDTH }, PIXEL_WIDTH>::new();
     loop {
         game.update();
         game.render(&mut display);
-        timer.start(Seconds(1));
+        timer.start(Milliseconds(500));
         block!(timer.wait()).unwrap();
     }
 }
