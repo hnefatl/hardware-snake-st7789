@@ -8,6 +8,8 @@ use hash32::{Hash, Hasher};
 use heapless::{self, FnvIndexMap};
 use st7789::Error;
 
+use crate::inputs::{Direction, GameInputs};
+
 /// A position on the screen. (0, 0) is the top-left of the screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Point {
@@ -44,29 +46,23 @@ impl Vector {
     pub fn new(dx: i8, dy: i8) -> Self {
         Vector { dx, dy }
     }
-}
 
-/// Screenspace directions, as an enum for convenient mapping to button inputs.
-///
-/// Can be converted into a `Vector` using `::into()`.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-enum Direction {
-    Up,
-    Right,
-    Down,
-    Left,
+    pub fn opposite(&self) -> Self {
+        Vector { dx: self.dx * -1, dy: self.dy * -1 }
+    }
 }
 impl Into<Vector> for Direction {
     fn into(self) -> Vector {
         match self {
-            Up => Vector::new(0, -1),
-            Down => Vector::new(0, 1),
-            Left => Vector::new(-1, 0),
-            Right => Vector::new(1, 0),
+            Direction::Up => Vector::new(0, -1),
+            Direction::Down => Vector::new(0, 1),
+            Direction::Left => Vector::new(-1, 0),
+            Direction::Right => Vector::new(1, 0),
         }
     }
 }
 
+/// Render a logical game position as pixels on the screen, with upscaling.
 fn _render_point<const PIXEL_WIDTH: u8, R>(point: &Point, colour: Rgb565, target: &mut R)
 where
     R: DrawTarget<Color = Rgb565, Error = Error<Infallible>>,
@@ -116,9 +112,10 @@ where
         let direction_delta: Vector = self.direction.into();
         let new_head = Self::_add_with_wraparound(old_head.clone(), direction_delta);
 
-        if food.remove(&new_head).is_none() {
-            // If we don't eat a food, then remove the last tail location. If we do eat food, then leave the tail point
-            // so that we increase our length by 1.
+        let ate_food = food.remove(&new_head).is_some();
+        if !ate_food {
+            // If we didn't eat a food, remove the last tail location to make up for the head moving. If we did eat food,
+            // leave the tail point where it is so that we increase our length by 1.
             self.old_tail = self.points.pop_back();
         }
 
@@ -128,16 +125,20 @@ where
     pub fn set_direction(&mut self, direction: Direction) {
         self.direction = direction
     }
+    pub fn get_direction(&self) -> Direction {
+        self.direction
+    }
 
     fn render<R>(&self, target: &mut R)
     where
         R: DrawTarget<Color = Rgb565, Error = Error<Infallible>>,
     {
-        for point in self.points.iter() {
-            _render_point::<PIXEL_WIDTH, R>(point, Self::COLOUR, target);
-        }
+        // Blank out the old tail position.
         if let Some(old_point) = self.old_tail {
             _render_point::<PIXEL_WIDTH, R>(&old_point, Rgb565::BLACK, target);
+        }
+        for point in self.points.iter() {
+            _render_point::<PIXEL_WIDTH, R>(point, Self::COLOUR, target);
         }
     }
 
@@ -194,6 +195,7 @@ where
     [(); GAME_WIDTH as usize * GAME_HEIGHT as usize]:,
 {
     snake: Snake<GAME_WIDTH, GAME_HEIGHT, PIXEL_WIDTH>,
+    inputs: GameInputs,
     food: heapless::FnvIndexMap<Point, Food, 8>,
     /// The number of food items to maintain on the board.
     num_food: usize,
@@ -202,15 +204,27 @@ impl<const GAME_WIDTH: u8, const GAME_HEIGHT: u8, const PIXEL_WIDTH: u8> Game<GA
 where
     [(); GAME_WIDTH as usize * GAME_HEIGHT as usize]:,
 {
-    pub fn new() -> Self {
+    pub fn new(inputs: GameInputs) -> Self {
         Game {
             snake: Snake::new(Point::new(GAME_WIDTH / 2, GAME_HEIGHT / 2), Direction::Right),
+            inputs,
             food: heapless::FnvIndexMap::new(),
             num_food: 1,
         }
     }
 
-    pub fn update(&mut self) {
+    /// The "fast" update cycle, for input/non-snake-"step" updates.
+    pub fn fast_update(&mut self) {
+        if let Some(direction) = self.inputs.get_joystick_direction() {
+            // Only change direction if it's not the opposite direction to the current.
+            if Into::<Vector>::into(direction).opposite() != self.snake.get_direction().into() {
+                self.snake.set_direction(direction);
+            }
+        }
+    }
+
+    /// The "slow" update cycle, once every game "step" (snake movement).
+    pub fn slow_update(&mut self) {
         self.snake.update(&mut self.food);
 
         while self.food.len() < self.num_food {

@@ -21,7 +21,28 @@ use stm32f3xx_hal::{
     timer::Timer,
 };
 
+mod inputs;
 mod game;
+
+// Pins, for reference:
+// st7789 pinouts: https://learn.adafruit.com/adafruit-1-3-color-tft-bonnet-for-raspberry-pi/pinouts
+//
+// 5V  -> brown
+// 3V  -> black
+// GND -> white
+//
+// GPIO24   -> purple -> pa3 (reset)
+// GPIO25   -> orange -> pa2 (SPI data)
+// SPI_CE0  -> red    -> pa4 (SPI chip select)
+// SPI_MOSI -> blue   -> pa7 (SPI MOSI)
+// SPI_MISO -> green  -> pa6 (SPI MISO)
+// SPI_SCLK -> yellow -> pa5 (SPI CLK)
+// GPIO26   -> grey   -> pa0 (backlight)
+//
+// GPIO17   -> brown  -> pd10
+// GPIO27   -> red    -> pd11
+// GPIO22   -> orange -> pd12
+// GPIO23   -> yellow -> pd13
 
 #[entry]
 fn main() -> ! {
@@ -40,6 +61,19 @@ fn main() -> ! {
     // https://www.st.com/resource/en/reference_manual/dm00043574-stm32f303xb-c-d-e-stm32f303x6-8-stm32f328x8-stm32f358xc-stm32f398xe-advanced-arm-based-mcus-stmicroelectronics.pdf
     // documents which peripherals are reachable over which buses.
     let mut gpioa = peripherals.GPIOA.split(&mut reset_and_clock_control.ahb);
+    let mut gpiod = peripherals.GPIOD.split(&mut reset_and_clock_control.ahb);
+
+    let joystick_up = gpiod.pd10.into_pull_up_input(&mut gpiod.moder, &mut gpiod.pupdr);
+    let joystick_left = gpiod.pd11.into_pull_up_input(&mut gpiod.moder, &mut gpiod.pupdr);
+    let joystick_down = gpiod.pd12.into_pull_up_input(&mut gpiod.moder, &mut gpiod.pupdr);
+    let joystick_right = gpiod.pd13.into_pull_up_input(&mut gpiod.moder, &mut gpiod.pupdr);
+
+    let game_inputs = inputs::GameInputs::new(
+        joystick_up.downgrade().downgrade(),
+        joystick_right.downgrade().downgrade(),
+        joystick_down.downgrade().downgrade(),
+        joystick_left.downgrade().downgrade(),
+    );
 
     let sclk = gpioa
         .pa5
@@ -76,11 +110,20 @@ fn main() -> ! {
     const GAME_HEIGHT_PIXELS: u8 = 240;
     const PIXEL_WIDTH: u8 = 10;
     let mut game =
-        game::Game::<{ GAME_WIDTH_PIXELS / PIXEL_WIDTH }, { GAME_HEIGHT_PIXELS / PIXEL_WIDTH }, PIXEL_WIDTH>::new();
+        game::Game::<{ GAME_WIDTH_PIXELS / PIXEL_WIDTH }, { GAME_HEIGHT_PIXELS / PIXEL_WIDTH }, PIXEL_WIDTH>::new(game_inputs);
+
+    const SLOW_UPDATES_PER_SECOND: u32 = 2;
+    const FAST_UPDATES_PER_SECOND: u32 = 100;
     loop {
-        timer.start(Milliseconds(500));
-        game.update();
+        // Render everything and run a single snake move
+        game.slow_update();
         game.render(&mut display);
-        block!(timer.wait()).unwrap();
+
+        // Then keep fast-updating until we need to do the next game move
+        for _ in 0..(FAST_UPDATES_PER_SECOND / SLOW_UPDATES_PER_SECOND) {
+            timer.start(Milliseconds(1000 / FAST_UPDATES_PER_SECOND));
+            game.fast_update();
+            block!(timer.wait()).unwrap();
+        }
     }
 }
