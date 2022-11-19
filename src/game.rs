@@ -1,8 +1,4 @@
-use core::{
-    convert::Infallible,
-    iter::{Cycle, Peekable},
-    slice::Iter,
-};
+use core::{convert::Infallible, iter::Cycle, slice::Iter};
 use embedded_graphics::{
     pixelcolor::Rgb565,
     prelude::{DrawTarget, RgbColor, Size},
@@ -117,12 +113,12 @@ where
         let Some(old_head) = self.points.front() else {
             return
         };
-        let delta: Vector = self.direction.into();
-        let new_head = Self::_add_with_wraparound(old_head.clone(), delta);
+        let direction_delta: Vector = self.direction.into();
+        let new_head = Self::_add_with_wraparound(old_head.clone(), direction_delta);
 
         if food.remove(&new_head).is_none() {
             // If we don't eat a food, then remove the last tail location. If we do eat food, then leave the tail point
-            // to increase our length by 1.
+            // so that we increase our length by 1.
             self.old_tail = self.points.pop_back();
         }
 
@@ -156,6 +152,7 @@ where
     fn _add_with_wraparound(point: Point, delta: Vector) -> Point {
         let x = point.x as i16 + delta.dx as i16;
         let y = point.y as i16 + delta.dy as i16;
+        // Euclidean remainder handles wraparound nicely, taking negative values to e.g. width - abs(value).
         Point {
             x: x.rem_euclid(GAME_WIDTH as i16) as u8,
             y: y.rem_euclid(GAME_HEIGHT as i16) as u8,
